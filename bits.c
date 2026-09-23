@@ -19,7 +19,7 @@
  * Difficulty: 1
  */
 int bitAnd(int x, int y) {
-    return 2;
+    return ~(~x | ~y);
 }
 
 /*
@@ -30,7 +30,7 @@ int bitAnd(int x, int y) {
  *   Difficulty: 1
  */
 int bitXor(int x, int y) {
-    return 2;
+    return ~(x & y) & ~(~x & ~y);
 }
 
 /*
@@ -50,7 +50,13 @@ int bitXor(int x, int y) {
  *   1 if x and y have the same sign , 0 otherwise.
  */
 int samesign(int x, int y) {
-    return 2;
+    if (!x) {
+        return !y;
+    }
+    if (!y) {
+        return 0;
+    }
+    return !((x ^ y) >> 31);
 }
 
 /*
@@ -63,7 +69,18 @@ int samesign(int x, int y) {
  *   Difficulty: 4
  */
 int logtwo(int v) {
-    return 2;
+    int a = (v > 0xffff) << 4;
+    v >>= a;
+    int y = (v > 0xff) << 3;
+    v >>= y;
+    a |= y;
+    y = (v > 0xf) << 2;
+    v >>= y;
+    a |= y;
+    y = (v > 0x3) << 1;
+    v >>= y;
+    a |= y;
+    return a | (v >> 1);
 }
 
 /*
@@ -76,7 +93,9 @@ int logtwo(int v) {
  *    Difficulty: 2
  */
 int byteSwap(int x, int n, int m) {
-    return 2;
+    int n8 = n << 3, m8 = m << 3;
+    int d = ((x >> n8) ^ (x >> m8)) & 0xff;
+    return x ^ (d << m8) ^ (d << n8);
 }
 
 /*
@@ -88,7 +107,12 @@ int byteSwap(int x, int n, int m) {
  *   Difficulty: 3
  */
 unsigned reverse(unsigned v) {
-    return 2;
+    v = v << 16 | v >> 16;
+    v = ((v & 0x00ff00ff) << 8) | ((v >> 8) & 0x00ff00ff);
+    v = ((v & 0x0f0f0f0f) << 4) | ((v >> 4) & 0x0f0f0f0f);
+    v = ((v & 0x33333333) << 2) | ((v >> 2) & 0x33333333);
+    v = ((v & 0x55555555) << 1) | ((v >> 1) & 0x55555555);
+    return v;
 }
 
 /*
@@ -100,7 +124,11 @@ unsigned reverse(unsigned v) {
  *   Difficulty: 3
  */
 int logicalShift(int x, int n) {
-    return 2;
+    int top = 0x80000000;
+    int b = !!n;
+    int k = n + ~b + 1;
+    int mask = ~(top >> k) | (top & (b + ~0));
+    return (x >> n) & mask;
 }
 
 /*
@@ -112,7 +140,17 @@ int logicalShift(int x, int n) {
  *   Difficulty: 4
  */
 int leftBitCount(int x) {
-    return 2;
+    x = ~x;
+    int a = !(x >> 16) << 4;
+    int y = !(x >> (24 + ~a + 1)) << 3;
+    a |= y;
+    y = !(x >> (28 + ~a + 1)) << 2;
+    a |= y;
+    y = !(x >> (30 + ~a + 1)) << 1;
+    a |= y;
+    y = !(x >> (31 + ~a + 1));
+    a |= y;
+    return a + !x;
 }
 
 /*
@@ -124,7 +162,31 @@ int leftBitCount(int x) {
  *   Difficulty: 4
  */
 unsigned float_i2f(int x) {
-    return 2;
+    if (x == 0) {
+        return 0;
+    }
+    unsigned sign = x & 0x80000000;
+    unsigned ux = x;
+    if (sign) {
+        ux = -ux;
+    }
+
+    unsigned E = 31 + 127;
+    while (~ux & 0x80000000) {
+        ux <<= 1;
+        --E;
+    }
+
+    unsigned M = (ux >> 8) & 0x007fffff;
+    if ((ux & 0xff) + (M & 1) > 0x80) {
+        ++M;
+        if (M == 0x00800000) {
+            M = 0;
+            ++E;
+        }
+    }
+
+    return sign | E << 23 | M;
 }
 
 /*
@@ -139,7 +201,19 @@ unsigned float_i2f(int x) {
  *   Difficulty: 4
  */
 unsigned floatScale2(unsigned uf) {
-    return 2;
+    unsigned E = uf >> 23 & 0xff;
+    // NaN
+    if (E == 0xff) {
+        return uf;
+    }
+    if (E == 0) {
+        return (uf & 0xff800000) | ((uf & 0x007fffff) << 1);
+    }
+    // -> +-inf
+    if (E == 0xfe) {
+        return (uf & 0x80000000) | 0x7f800000;
+    }
+    return uf + 0x00800000;
 }
 
 /*
@@ -156,7 +230,23 @@ unsigned floatScale2(unsigned uf) {
  *   Difficulty: 3
  */
 int float64_f2i(unsigned uf1, unsigned uf2) {
-    return 2;
+    unsigned E = (uf2 >> 20) & 0x7ff;
+    if (E < 0x3ff) {
+        return 0;
+    }
+    if (E >= 0x7ff) {
+        return 0x80000000;
+    }
+    E -= 0x3ff;
+    if (E >= 31) {
+        return 0x80000000;
+    }
+    int S = 0x40000000 | ((uf2 & 0xfffff) << 10) | ((uf1 >> 22) & 0x3ff);
+    S >>= 30 - E;
+    if (uf2 & 0x80000000) {
+        return -S;
+    }
+    return S;
 }
 
 /*
@@ -173,5 +263,14 @@ int float64_f2i(unsigned uf1, unsigned uf2) {
  *   Difficulty: 4
  */
 unsigned floatPower2(int x) {
-    return 2;
+    if (x < -149) {
+        return 0;
+    }
+    if (x < -126) {
+        return 1 << (x + 149);
+    }
+    if (x <= 127) {
+        return (x + 127) << 23;
+    }
+    return 0x7f800000;
 }
